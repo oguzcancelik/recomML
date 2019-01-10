@@ -1,8 +1,8 @@
-# Song Recommendation
+# recomML
 
 - It's a machine learning project about recommending songs to a user based on user's music taste.
 
-- **Note**: You need a Spotify API key to run this project properly. You can get one from [Spotify's official developer website](https://developer.spotify.com/). If you don't have a chance to get one, I can provide my own key to you.
+- **Note**: You need a Spotify API key to run this project properly. You can get one from [Spotify's official developer website](https://developer.spotify.com/).
 
 - You need to fill **.env** file with your API information.
     - spotify_username="***"
@@ -47,5 +47,3 @@ Enter the URL you were redirected to:
 - Getting tracks of a playlist at the first time would take a few minutes. Running second time will be a lot faster.
 
 - **Note:** Authentication only needed in the first time. 
-
-- **Note:** You can ask any unclear point.
