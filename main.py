@@ -16,7 +16,8 @@ from sklearn.naive_bayes import GaussianNB
 
 
 def delete_tracks():
-    c.execute("""DELETE FROM user_tracks WHERE username LIKE ?""", (spotify_username,))
+    with connection:
+        c.execute("""DELETE FROM user_tracks WHERE username LIKE ?""", (spotify_username,))
 
 
 def get_user_playlists():
@@ -261,6 +262,8 @@ disliked_playlist = 'disliked'
 if len(sys.argv) > 1:
     if sys.argv[1] == '-d':
         liked_playlist = ' '.join(sys.argv[2:])
+        if not len(sys.argv) > 2:
+            raise Exception("No playlist provided.\nUsage: python main.py -d playlist name")
         delete_tracks()
         with connection:
             c.execute("""DELETE FROM last_playlist WHERE username LIKE ?""", (spotify_username,))
