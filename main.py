@@ -15,6 +15,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 
 
+def get_last_playlist():
+    c.execute("""SELECT playlist_name FROM last_playlist WHERE username LIKE ?""", (spotify_username,))
+    return c.fetchone()
+
+
 def delete_tracks():
     with connection:
         c.execute("""DELETE FROM user_tracks WHERE username LIKE ?""", (spotify_username,))
@@ -53,16 +58,17 @@ def get_tracks_from_database():
     all_tracks.clear()
     related_artist_ids = liked_artist_ids[:]
     for i in range(0, len(liked_artist_ids), 100):
-        query = """SELECT DISTINCT related_artist_id FROM related_artists WHERE artist_id IN ({i})""".format(
+        query = """SELECT related_artist_id FROM related_artists WHERE artist_id IN ({i})""".format(
             i=','.join(['?'] * len(liked_artist_ids[i:i + 100])))
         c.execute(query, liked_artist_ids[i:i + 100])
         result = c.fetchall()
         related_artist_ids += [x[0] for x in result]
     for i in range(0, len(related_artist_ids), 100):
         query = """SELECT * FROM (SELECT * FROM song_information WHERE artist_id IN ({i}) ORDER BY RANDOM()) 
-        GROUP BY artist_id ORDER BY RANDOM() LIMIT 20""".format(i=','.join(['?'] * len(related_artist_ids[i:i + 100])))
+        GROUP BY artist_id ORDER BY RANDOM() LIMIT 8""".format(i=','.join(['?'] * len(related_artist_ids[i:i + 100])))
         c.execute(query, related_artist_ids[i:i + 100])
         all_tracks += c.fetchall()
+    print('all_tracks:', len(all_tracks))
 
 
 def get_related_artists():
@@ -268,11 +274,17 @@ if len(sys.argv) > 1:
         with connection:
             c.execute("""DELETE FROM last_playlist WHERE username LIKE ?""", (spotify_username,))
             c.execute("""INSERT INTO last_playlist VALUES (?,?)""", (spotify_username, liked_playlist))
+    if sys.argv[1] == '-l':
+        last_playlist = get_last_playlist()
+        if last_playlist:
+            print(last_playlist[0])
+        else:
+            print('No playlist is used before.')
+        sys.exit()
 else:
-    c.execute("""SELECT playlist_name FROM last_playlist WHERE username LIKE ?""", (spotify_username,))
-    result = c.fetchone()
-    if result:
-        liked_playlist = result[0]
+    last_playlist = get_last_playlist()
+    if last_playlist:
+        liked_playlist = last_playlist[0]
     else:
         raise Exception("No playlist provided.\nUsage: python main.py -d playlist name")
 
