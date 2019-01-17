@@ -17,7 +17,11 @@ from sklearn.naive_bayes import GaussianNB
 
 def get_last_playlist():
     c.execute("""SELECT playlist_name FROM last_playlist WHERE username LIKE ?""", (spotify_username,))
-    return c.fetchone()
+    result = c.fetchone()
+    if result:
+        return result[0]
+    else:
+        raise Exception("No playlist provided.\nUsage: python main.py -d playlist name")
 
 
 def delete_tracks():
@@ -234,10 +238,6 @@ def update_token():
     spotify = spotipy.Spotify(auth=token)
 
 
-# ignore warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 # load environment variables from .env file
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
@@ -249,21 +249,13 @@ redirect_uri = os.environ.get("redirect_uri")
 spotify_username = os.environ.get("spotify_username")
 scope = os.environ.get("scope")
 
-token = None
-spotify = spotipy.Spotify
-update_token()
-
 # create database connection
 connection = sqlite3.connect('spotify.sqlite3')
 c = connection.cursor()
 
-all_tracks = []
-liked_artist_ids = []
-user_tracks = []
-user_playlists = []
-ready = False
 liked_playlist = ''
 disliked_playlist = 'disliked'
+test_classifiers = False
 
 if len(sys.argv) > 1:
     if sys.argv[1] == '-d':
@@ -274,19 +266,24 @@ if len(sys.argv) > 1:
         with connection:
             c.execute("""DELETE FROM last_playlist WHERE username LIKE ?""", (spotify_username,))
             c.execute("""INSERT INTO last_playlist VALUES (?,?)""", (spotify_username, liked_playlist))
-    if sys.argv[1] == '-l':
-        last_playlist = get_last_playlist()
-        if last_playlist:
-            print(last_playlist[0])
-        else:
-            print('No playlist is used before.')
+    elif sys.argv[1] == '-l':
+        print(get_last_playlist())
         sys.exit()
+    elif sys.argv[1] == '-t':
+        test_classifiers = True
+        liked_playlist = get_last_playlist()
 else:
-    last_playlist = get_last_playlist()
-    if last_playlist:
-        liked_playlist = last_playlist[0]
-    else:
-        raise Exception("No playlist provided.\nUsage: python main.py -d playlist name")
+    liked_playlist = get_last_playlist()
+
+token = None
+spotify = spotipy.Spotify
+update_token()
+
+all_tracks = []
+liked_artist_ids = []
+user_tracks = []
+user_playlists = []
+ready = False
 
 get_user_tracks()
 if not ready:
@@ -295,6 +292,10 @@ if not ready:
     if all_tracks:
         get_song_information()
 get_tracks_from_database()
+
+# ignore warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 columns_user = ["track_id", "track_name", "artist_id", "artist_name", "username", "acousticness", "danceability",
                 "energy", "duration_ms", "instrumentalness", "key", "liveness", "loudness", "mode", "speechiness",
@@ -307,30 +308,28 @@ test_df = pd.DataFrame.from_records(all_tracks, columns=columns_all, index='trac
 
 X = train_df.loc[:, 'acousticness':'valence'].as_matrix().astype('float')
 y = train_df['isLiked'].ravel()
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 test_X = test_df.loc[:, 'acousticness':].as_matrix().astype('float')
 
 rfc = RandomForestClassifier(n_estimators=200, max_features='log2', min_samples_leaf=1)
-rfc.fit(X_train, y_train)
 
-gnb = GaussianNB()
-gnb.fit(X_train, y_train)
+if test_classifiers:
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
+    rfc.fit(X_train, y_train)
+    gnb = GaussianNB()
+    gnb.fit(X_train, y_train)
 
-rfc_accuracy = accuracy_score(y_test, rfc.predict(X_test))
-gnb_accuracy = accuracy_score(y_test, gnb.predict(X_test))
+    rfc_accuracy = accuracy_score(y_test, rfc.predict(X_test))
+    gnb_accuracy = accuracy_score(y_test, gnb.predict(X_test))
 
-if rfc_accuracy >= gnb_accuracy:
-    predictions = rfc.predict(test_X)
-    print("accuracy_score:", accuracy_score(y_test, rfc.predict(X_test)))
-    print("confusion_matrix:\n", confusion_matrix(y_test, rfc.predict(X_test)))
-    print("precision_score:", precision_score(y_test, rfc.predict(X_test)))
-    print("recall_score:", recall_score(y_test, rfc.predict(X_test)))
+    if rfc_accuracy >= gnb_accuracy:
+        predictions = rfc.predict(test_X)
+        print("accuracy_score:", accuracy_score(y_test, rfc.predict(X_test)))
+    else:
+        predictions = gnb.predict(test_X)
+        print("accuracy_score:", accuracy_score(y_test, gnb.predict(X_test)))
 else:
-    predictions = gnb.predict(test_X)
-    print("accuracy_score:", accuracy_score(y_test, gnb.predict(X_test)))
-    print("confusion_matrix:\n", confusion_matrix(y_test, gnb.predict(X_test)))
-    print("precision_score:", precision_score(y_test, gnb.predict(X_test)))
-    print("recall_score:", recall_score(y_test, gnb.predict(X_test)))
+    rfc.fit(X, y)
+    predictions = rfc.predict(test_X)
 
 recommend_df = pd.DataFrame({'track_id': test_df.index, 'isLiked': predictions})
 
