@@ -1,0 +1,7 @@
+*.json
+*.log
+.env
+__pycache__
+.cache*
+*.db
+*.sqlite3
