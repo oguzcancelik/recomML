@@ -96,6 +96,7 @@ def get_related_artists():
 def get_song_information():
     global all_tracks
     update_token()
+    print('Started getting track features.')
     insert_tracks = []
     features = []
     track_ids = [x[0] for x in all_tracks]
@@ -106,7 +107,6 @@ def get_song_information():
         f = features[i]
         if not f:
             continue
-        print('Song information:', t[3])
         insert_tracks.append((t[0], t[1], t[2], t[3], f['acousticness'], f['danceability'], f['energy'],
                               f['duration_ms'], f['instrumentalness'], f['key'], f['liveness'], f['loudness'],
                               f['mode'], f['speechiness'], f['tempo'], f['time_signature'], f['valence']))
@@ -114,6 +114,7 @@ def get_song_information():
         with connection:
             c.executemany("""INSERT INTO song_information VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", insert_tracks)
         insert_tracks.clear()
+    print('Completed getting track features.')
 
 
 def get_tracks(album_ids):
@@ -145,9 +146,9 @@ def get_albums(artist_id, artist_name):
 
 
 def get_artists():
-    c.execute("""SELECT DISTINCT artist_id,artist_name FROM related_artists WHERE 
-    artist_id NOT IN (SELECT artist_id FROM excluded_artists) AND
-    artist_id NOT IN (SELECT DISTINCT artist_id FROM song_information)""")
+    c.execute("""SELECT DISTINCT related_artist_id,related_artist_name FROM related_artists WHERE 
+    related_artist_id NOT IN (SELECT artist_id FROM excluded_artists) AND
+    related_artist_id NOT IN (SELECT DISTINCT artist_id FROM song_information)""")
     artist_ids = c.fetchall()
     if not artist_ids:
         return
